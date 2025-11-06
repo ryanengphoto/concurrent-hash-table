@@ -22,29 +22,40 @@ impl HashTable {
         }
     }
 
-    pub fn insert(&mut self, name: &str, salary: u32) {
+    pub fn insert(&mut self, line: String) {
         let _write_guard = self.lock.write().unwrap();
         // TODO: compute Jenkins hash and insert/update node
-        println!("Inserting: {}, {}", name, salary);
+        println!("Inserting");
     }
 
-    pub fn delete(&mut self, name: &str) {
+    pub fn update(&mut self, line: String) {
+        let _write_guard = self.lock.write().unwrap();
+        // TODO: compute Jenkins hash and insert/update node
+        println!("Updating");
+    }
+
+    pub fn delete(&mut self, line: String) {
         let _write_guard = self.lock.write().unwrap();
         // TODO: delete node
-        println!("Deleting: {}", name);
+        println!("Deleting");
     }
 
-    pub fn update_salary(&mut self, name: &str, salary: u32) {
+    pub fn update_salary(&mut self, line: String) {
         let _write_guard = self.lock.write().unwrap();
         // TODO: find node and update salary
-        println!("Updating salary: {} -> {}", name, salary);
+        println!("Updating");
     }
 
-    pub fn search(&self, name: &str) -> Option<u32> {
+    pub fn search(&self, line: String) {
         let _read_guard = self.lock.read().unwrap();
         // TODO: search for node
-        println!("Searching for: {}", name);
-        None
+        println!("Searching for");
+    }
+
+    pub fn print(&mut self, line: String) {
+        let _write_guard = self.lock.write().unwrap();
+        // TODO: find node and update salary
+        println!("{}", line);
     }
 
     pub fn print_all(&self) {
