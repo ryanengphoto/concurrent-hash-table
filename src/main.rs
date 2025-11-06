@@ -9,7 +9,7 @@ use std::thread;
 fn main() {
     let hash_table = Arc::new(Mutex::new(HashTable::new()));
 
-    let file = File::open("commands.txt").expect("commands.txt not found");
+    let file = File::open("../commands.txt").expect("../commands.txt not found");
     let reader = BufReader::new(file);
 
     let mut handles = vec![];
