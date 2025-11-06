@@ -1,18 +1,31 @@
+mod hash_table;
+
+use hash_table::HashTable;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
 fn main() {
-    // A small, friendly CLI that prints a belly-wash routine.
-    // Kept intentionally simple per user request: "wash mah belly" -> "in rust".
-    let instructions = r#"
-Belly-wash routine (gentle):
+    let hash_table = Arc::new(Mutex::new(HashTable::new()));
 
-1) Use warm, not hot water to wet the belly.
-2) Apply a small amount of mild soap or body wash to your hands or a soft washcloth.
-3) Gently rub in circular motions over the belly for 20–30 seconds. Don't scrub if skin is irritated.
-4) Rinse thoroughly with warm water.
-5) Pat dry with a clean towel — don't rub.
-6) Moisturize if your skin feels dry.
+    let file = File::open("commands.txt").expect("commands.txt not found");
+    let reader = BufReader::new(file);
 
-Stay gentle and stop if you feel pain or irritation.
-"#;
+    let mut handles = vec![];
 
-    println!("{}", instructions);
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let table_clone = Arc::clone(&hash_table);
+        let handle = thread::spawn(move || {
+            // TODO: parse command line
+            println!("Executing command: {}", line);
+            // TODO: call insert/delete/search/print based on command
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
 }
