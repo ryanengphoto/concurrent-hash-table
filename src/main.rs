@@ -24,15 +24,14 @@ fn main() {
             // lock table for access
             let mut table = table_clone.lock().unwrap();
 
-            let (command, _args) = line.split_once(',').unwrap_or((&line, ""));
+            let parts: Vec<&str> = line.split(',').collect();
 
-            match command {
-                "insert" => table.insert(line),
-                "update" => table.update(line),
-                "delete" => table.delete(line),
-                "search" => table.search(line),
-                "print" => table.print(line),
-                _ => println!("Unknown command: {}", command)
+            match parts[0] {
+                "insert" => table.insert(parts[1].to_string(), parts[2].parse().unwrap()),
+                "update" => table.updateSalary(parts[1].to_string(), parts[2].parse().unwrap()),
+                "delete" => table.delete(parts[1].to_string()),
+                "search" => table.search(parts[1].to_string()),
+                _ => println!("Unknown command: {}", parts[0])
             }
 
             // TODO: call insert/delete/search/print based on command
