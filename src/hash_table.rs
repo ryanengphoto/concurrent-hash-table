@@ -65,13 +65,27 @@ impl HashTable {
         let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
         // TODO: find node and update salary
-        println!("Updating");
     }
 
-    pub fn search(&self, key: &str) {
+    pub fn search(&self, key: &str) -> Option<u32> {
+        self.search_record(key).map(|record| record.salary)
+    }
+
+    fn search_record(&self, key: &str) -> Option<&HashRecord> {
         let _read_guard = self.lock.read().unwrap();
-        // TODO: search for node
-        println!("Searching for");
+
+        let mut current = self.head.as_deref();
+        let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        while let Some(record) = current {
+            if record.hash == hashed_val && record.name == key {
+                return Some(record);
+            }
+
+            current = record.next.as_deref();
+        }
+
+        None
     }
 
     /*
