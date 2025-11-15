@@ -38,34 +38,34 @@ impl HashTable {
         return hash;
     }
 
-    pub fn insert(&mut self, key: String, value: u32) {
+    pub fn insert(&mut self, key: &str, value: u32) {
         let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
         println!("Inserting");
     }
 
-    pub fn delete(&mut self, key: String) {
+    pub fn delete(&mut self, key: &str) {
         let _write_guard = self.lock.write().unwrap();
         // TODO: delete node
         println!("Deleting");
     }
 
-    pub fn updateSalary(&mut self, key: String, value: u32) {
+    pub fn updateSalary(&mut self, key: &str, value: u32) {
         let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
         // TODO: find node and update salary
         println!("Updating");
     }
 
-    pub fn search(&self, key: String) {
+    pub fn search(&self, key: &str) {
         let _read_guard = self.lock.read().unwrap();
         // TODO: search for node
         println!("Searching for");
     }
 
-    /* 
+    /*
 
-    pub fn print(&mut self, line: String) {
+    pub fn print(&mut self, line: &str) {
         let _write_guard = self.lock.write().unwrap();
         // TODO: find node and update salary
         println!("{}", line);
