@@ -41,7 +41,18 @@ impl HashTable {
     pub fn insert(&mut self, key: &str, value: u32) {
         let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
-        println!("Inserting");
+
+        // TODO: check for duplicates before inserting,
+        // probably return Result
+
+        let new_record = HashRecord {
+            hash: hashed_val,
+            name: key.to_string(),
+            salary: value,
+            next: self.head.take(),
+        };
+
+        self.head = Some(Box::new(new_record));
     }
 
     pub fn delete(&mut self, key: &str) {
