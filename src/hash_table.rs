@@ -42,23 +42,51 @@ impl HashTable {
         let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
 
-        // TODO: check for duplicates before inserting,
-        // probably return Result
+        // start linked list traversal
+        let mut cur = &mut self.head;
 
-        let new_record = HashRecord {
-            hash: hashed_val,
-            name: key.to_string(),
-            salary: value,
-            next: self.head.take(),
-        };
+        // if list empty, just set head
+        if cur.is_none() {
+            *cur = Some(Box::new(HashRecord {hash: hashed_val, name: key, salary: value, next: None,}));
+            println!("Inserted at head");
+            return;
+        }
 
-        self.head = Some(Box::new(new_record));
+        // traverse to the end
+        while let Some(ref mut node) = cur {
+            if node.hash == hashed_val && node.name == key {
+                println!("Error: Key already exists: {}", key);
+                return;
+            }
+
+            if node.next.is_none() {
+                node.next = Some(Box::new(HashRecord {hash: hashed_val, name: key, salary: value, next: None,}));
+                println!("Appended new record: {} -> {}", key, value);
+                return;
+            }
+
+            cur = &mut node.next;
+        }
     }
 
-    pub fn delete(&mut self, key: &str) {
+
+    pub fn delete(&mut self, key: String) {
         let _write_guard = self.lock.write().unwrap();
-        // TODO: delete node
-        println!("Deleting");
+        let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        let mut cur = &mut self.head;
+
+        while let Some(ref mut node) = cur {
+            if node.hash == hashed_val && node.name == key {
+                *cur = node.next.take();
+                println!("Deleted {}", key);
+                return;
+            } else {
+                cur = &mut node.next;
+            }
+        }
+
+        println!("Key not found: {}", key);
     }
 
     pub fn updateSalary(&mut self, key: &str, value: u32) {
