@@ -54,10 +54,8 @@ impl HashTable {
 
         // traverse to the end
         while let Some(ref mut node) = cur {
-            // if key exists, update instead of insert
             if node.hash == hashed_val && node.name == key {
-                node.salary = value;
-                println!("Updated existing record: {} -> {}", key, value);
+                println!("Error: Key already exists: {}", key);
                 return;
             }
 
