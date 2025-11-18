@@ -18,10 +18,8 @@ fn main() {
         let line = line.unwrap();
         let table_clone = Arc::clone(&hash_table);
         let handle = thread::spawn(move || {
-            // TODO: parse command line
             println!("Executing command: {}", line);
-
-            // lock table for access
+            
             let mut table = table_clone.lock().unwrap();
 
             let parts: Vec<&str> = line.split(',').collect();
@@ -33,8 +31,6 @@ fn main() {
                 "search" => table.search(parts[1].to_string()),
                 _ => println!("Unknown command: {}", parts[0])
             }
-
-            // TODO: call insert/delete/search/print based on command
         });
         handles.push(handle);
     }
