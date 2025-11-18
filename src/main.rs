@@ -19,17 +19,18 @@ fn main() {
         let table_clone = Arc::clone(&hash_table);
         let handle = thread::spawn(move || {
             println!("Executing command: {}", line);
-            
+
             let mut table = table_clone.lock().unwrap();
 
             let parts: Vec<&str> = line.split(',').collect();
 
             match parts[0] {
-                "insert" => table.insert(parts[1].to_string(), parts[2].parse().unwrap()),
-                "update" => table.updateSalary(parts[1].to_string(), parts[2].parse().unwrap()),
-                "delete" => table.delete(parts[1].to_string()),
-                "search" => table.search(parts[1].to_string()),
-                _ => println!("Unknown command: {}", parts[0])
+                "insert" => table.insert(parts[1], parts[2].parse().unwrap()),
+                "update" => table.updateSalary(parts[1], parts[2].parse().unwrap()),
+                "delete" => table.delete(parts[1]),
+                "search" => { table.search(parts[1]); },
+                "print"  => table.print(),
+                _ => println!("Unknown command: {}", parts[0]),
             }
         });
         handles.push(handle);
