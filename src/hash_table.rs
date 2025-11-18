@@ -39,7 +39,7 @@ impl HashTable {
     }
 
     pub fn insert(&mut self, key: &str, value: u32) {
-        let _write_guard = self.lock.write().unwrap();
+        
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
 
         // start linked list traversal
@@ -47,6 +47,7 @@ impl HashTable {
 
         // if list empty, just set head
         if cur.is_none() {
+            let _write_guard = self.lock.write().unwrap();
             *cur = Some(Box::new(HashRecord {hash: hashed_val, name: key, salary: value, next: None,}));
             println!("Inserted at head");
             return;
@@ -60,6 +61,7 @@ impl HashTable {
             }
 
             if node.next.is_none() {
+                let _write_guard = self.lock.write().unwrap();
                 node.next = Some(Box::new(HashRecord {hash: hashed_val, name: key, salary: value, next: None,}));
                 println!("Appended new record: {} -> {}", key, value);
                 return;
@@ -70,9 +72,9 @@ impl HashTable {
     }
 
 
-    pub fn delete(&mut self, key: String) {
-        let _write_guard = self.lock.write().unwrap();
+    pub fn delete(&mut self, key: &str) {
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
+        let _write_guard = self.lock.write().unwrap();
 
         let mut cur = &mut self.head;
 
@@ -90,9 +92,27 @@ impl HashTable {
     }
 
     pub fn updateSalary(&mut self, key: &str, value: u32) {
-        let _write_guard = self.lock.write().unwrap();
         let hashed_val = HashTable::jenkins_one_at_a_time_hash(key.as_bytes());
-        // TODO: find node and update salary
+
+        // start linked list traversal
+        let mut cur = &mut self.head;
+
+        if cur.is_none() {
+            return;
+        }
+
+        // traverse to the end
+        while let Some(ref mut node) = cur {
+            if node.hash == hashed_val && node.name == key {
+                node.salary = value;
+                return;
+            }
+            if node.next.is_none() {
+                return;
+            }
+
+            cur = &mut node.next;
+        }
     }
 
     pub fn search(&self, key: &str) -> Option<u32> {
@@ -115,20 +135,4 @@ impl HashTable {
 
         None
     }
-
-    /*
-
-    pub fn print(&mut self, line: &str) {
-        let _write_guard = self.lock.write().unwrap();
-        // TODO: find node and update salary
-        println!("{}", line);
-    }
-
-    pub fn print_all(&self) {
-        let _read_guard = self.lock.read().unwrap();
-        // TODO: iterate list and print
-        println!("Printing all records...");
-    }
-
-    */
 }
