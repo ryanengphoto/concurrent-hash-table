@@ -217,8 +217,30 @@ impl HashTable {
         for r in vec {
             println!("{},{},{}", r.hash, r.name, r.salary);
         }
-        
+
         drop(_read);
         log_to_file(log_file, priority, "READ LOCK RELEASED");
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn test_hash() {
+        use super::HashTable;
+
+        let cases = vec![
+            ("a", 0xca2e9442),
+            ("The quick brown fox jumps over the lazy dog", 0x519e91f5),
+        ];
+
+        for (input, expected) in cases {
+            let hash_value = HashTable::jenkins_one_at_a_time_hash(input.as_bytes());
+            assert_eq!(
+                expected, hash_value,
+                "Hash mismatch: computed {:x}, expected {:x}",
+                hash_value, expected
+            );
+        }
     }
 }
