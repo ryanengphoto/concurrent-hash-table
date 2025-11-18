@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() {
-    let hash_table = Arc::new(Mutex::new(HashTable::new()));
+    let hash_table = Arc::new(HashTable::new());
     let log_file = Arc::new(Mutex::new(
-        File::create("hash.log").expect("Failed to create hash.log")
+        File::create("hash.log").expect("Failed to create hash.log"),
     ));
 
     let file = File::open("commands.txt").expect("commands.txt not found");
@@ -22,10 +22,10 @@ fn main() {
         let line = line.unwrap();
         let table_clone = Arc::clone(&hash_table);
         let log_clone = Arc::clone(&log_file);
-        
+
         let handle = thread::spawn(move || {
             let parts: Vec<&str> = line.split(',').collect();
-            
+
             if parts.len() < 3 {
                 println!("Invalid command format: {}", line);
                 return;
@@ -35,31 +35,31 @@ fn main() {
             let name = parts[1].trim();
             let priority: u32 = parts[parts.len() - 1].trim().parse().unwrap();
 
-            let mut table = table_clone.lock().unwrap();
+            let table = Arc::clone(&table_clone);
             let mut log = log_clone.lock().unwrap();
 
             match command {
                 "insert" => {
                     let salary: u32 = parts[2].trim().parse().unwrap();
                     table.insert(name, salary, priority, &mut log);
-                },
+                }
                 "update" => {
                     let salary: u32 = parts[2].trim().parse().unwrap();
                     table.update_salary(name, salary, priority, &mut log);
-                },
+                }
                 "delete" => {
                     table.delete(name, priority, &mut log);
-                },
+                }
                 "search" => {
                     table.search(name, priority, &mut log);
-                },
+                }
                 "print" => {
                     table.print(priority, &mut log);
-                },
+                }
                 _ => println!("Unknown command: {}", command),
             }
         });
-        
+
         handles.push(handle);
     }
 
@@ -68,7 +68,7 @@ fn main() {
     }
 
     // Final print as required by assignment
-    let table = hash_table.lock().unwrap();
     let mut log = log_file.lock().unwrap();
-    table.print(0, &mut log);
+    hash_table.print(0, &mut log);
 }
+
