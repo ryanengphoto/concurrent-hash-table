@@ -1,3 +1,4 @@
+// main.rs
 mod hash_table;
 
 use hash_table::HashTable;
@@ -8,6 +9,9 @@ use std::thread;
 
 fn main() {
     let hash_table = Arc::new(Mutex::new(HashTable::new()));
+    let log_file = Arc::new(Mutex::new(
+        File::create("hash.log").expect("Failed to create hash.log")
+    ));
 
     let file = File::open("commands.txt").expect("commands.txt not found");
     let reader = BufReader::new(file);
@@ -17,26 +21,54 @@ fn main() {
     for line in reader.lines() {
         let line = line.unwrap();
         let table_clone = Arc::clone(&hash_table);
+        let log_clone = Arc::clone(&log_file);
+        
         let handle = thread::spawn(move || {
-            println!("Executing command: {}", line);
+            let parts: Vec<&str> = line.split(',').collect();
+            
+            if parts.len() < 3 {
+                println!("Invalid command format: {}", line);
+                return;
+            }
+
+            let command = parts[0].trim();
+            let name = parts[1].trim();
+            let priority: u32 = parts[parts.len() - 1].trim().parse().unwrap();
 
             let mut table = table_clone.lock().unwrap();
+            let mut log = log_clone.lock().unwrap();
 
-            let parts: Vec<&str> = line.split(',').collect();
-
-            match parts[0] {
-                "insert" => table.insert(parts[1], parts[2].parse().unwrap()),
-                "update" => table.updateSalary(parts[1], parts[2].parse().unwrap()),
-                "delete" => table.delete(parts[1]),
-                "search" => { table.search(parts[1]); },
-                "print"  => table.print(),
-                _ => println!("Unknown command: {}", parts[0]),
+            match command {
+                "insert" => {
+                    let salary: u32 = parts[2].trim().parse().unwrap();
+                    table.insert(name, salary, priority, &mut log);
+                },
+                "update" => {
+                    let salary: u32 = parts[2].trim().parse().unwrap();
+                    table.update_salary(name, salary, priority, &mut log);
+                },
+                "delete" => {
+                    table.delete(name, priority, &mut log);
+                },
+                "search" => {
+                    table.search(name, priority, &mut log);
+                },
+                "print" => {
+                    table.print(priority, &mut log);
+                },
+                _ => println!("Unknown command: {}", command),
             }
         });
+        
         handles.push(handle);
     }
 
     for handle in handles {
         handle.join().unwrap();
     }
+
+    // Final print as required by assignment
+    let table = hash_table.lock().unwrap();
+    let mut log = log_file.lock().unwrap();
+    table.print(0, &mut log);
 }
