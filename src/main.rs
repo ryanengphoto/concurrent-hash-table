@@ -20,7 +20,7 @@ fn main() {
 
     for line in reader.lines() {
         let line = line.unwrap();
-        let table_clone = Arc::clone(&hash_table);
+        let table = Arc::clone(&hash_table);
         let log_clone = Arc::clone(&log_file);
 
         let handle = thread::spawn(move || {
@@ -35,7 +35,6 @@ fn main() {
             let name = parts[1].trim();
             let priority: u32 = parts[parts.len() - 1].trim().parse().unwrap();
 
-            let table = Arc::clone(&table_clone);
             let mut log = log_clone.lock().unwrap();
 
             match command {
@@ -71,4 +70,3 @@ fn main() {
     let mut log = log_file.lock().unwrap();
     hash_table.print(0, &mut log);
 }
-
