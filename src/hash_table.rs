@@ -181,8 +181,13 @@ impl HashTable {
         None
     }
 
-    pub fn print(&self, priority: u32, log_file: &mut File) {
-        log_to_file(log_file, priority, "PRINT");
+    pub fn print(&self, priority: Option<u32>, log_file: &mut File) {
+        // Print out in thread log only if priority is Some
+        match priority {
+            Some(priority) => log_to_file(log_file, priority, "PRINT"),
+            None => {}
+        }
+
         let read_guard = self.head.read().unwrap();
 
         println!("Current Database:");
