@@ -166,7 +166,7 @@ impl HashTable {
         );
         let read_guard = self.head.read().unwrap();
 
-        let mut cur = read_guard.as_ref();
+        let mut cur = read_guard.as_deref();
 
         while let Some(r) = cur {
             if r.hash == hashed_val && r.name == key {
@@ -174,7 +174,7 @@ impl HashTable {
                 println!("Found: {},{},{}", r.hash, r.name, salary);
                 return Some(salary);
             }
-            cur = r.next.as_ref();
+            cur = r.next.as_deref();
         }
 
         println!("Not Found:  {} not found.", key);
