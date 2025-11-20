@@ -1,32 +1,52 @@
-// hash_table.rs
-use std::fs::File;
-use std::io::Write;
-use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fmt, sync::RwLock};
 
 #[derive(Debug, Clone)]
 pub struct HashRecord {
     pub hash: u32,
     pub name: String,
     pub salary: u32,
-    pub next: Option<Box<HashRecord>>,
 }
 
-pub fn current_timestamp() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_micros()
+impl fmt::Display for HashRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{},{},{}", self.hash, self.name, self.salary)
+    }
 }
 
-fn log_to_file(log_file: &mut File, priority: u32, message: &str) {
-    let timestamp = current_timestamp();
-    let log_entry = format!("{}: THREAD {} {}\n", timestamp, priority, message);
-    let _ = log_file.write_all(log_entry.as_bytes());
+#[derive(Debug, Clone)]
+pub struct Node {
+    record: HashRecord,
+    next: Option<Box<Node>>,
+}
+
+// Result types for operations
+pub enum InsertResult {
+    Success { record: HashRecord },
+    Duplicate { hash: u32 },
+}
+
+pub enum DeleteResult {
+    Success { record: HashRecord },
+    NotFound { hash: u32 },
+}
+
+pub enum UpdateResult {
+    Success {
+        old_record: HashRecord,
+        new_record: HashRecord,
+    },
+    NotFound {
+        hash: u32,
+    },
+}
+
+pub enum SearchResult {
+    Found { record: HashRecord },
+    NotFound { name: String },
 }
 
 pub struct HashTable {
-    pub head: RwLock<Option<Box<HashRecord>>>,
+    pub head: RwLock<Option<Box<Node>>>,
 }
 
 impl HashTable {
@@ -43,83 +63,71 @@ impl HashTable {
             hash = hash.wrapping_add(hash << 10);
             hash ^= hash >> 6;
         }
-
         hash = hash.wrapping_add(hash << 3);
         hash ^= hash >> 11;
         hash = hash.wrapping_add(hash << 15);
         hash
     }
 
-    pub fn insert(&self, key: &str, value: u32, priority: u32, log_file: &mut File) {
+    pub fn insert(&self, key: &str, value: u32, priority: u32) -> InsertResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
-
-        log_to_file(
-            log_file,
-            priority,
-            &format!("INSERT,{},{},{}", hashed_val, key, value),
-        );
         let mut write_guard = self.head.write().unwrap();
 
+        // Check for duplicates
         let mut cur_node = write_guard.as_deref();
         while let Some(node) = cur_node {
-            if node.hash == hashed_val && node.name == key {
-                println!("Insert failed.  Entry {} is a duplicate.", hashed_val);
-                return;
+            if node.record.hash == hashed_val && node.record.name == key {
+                return InsertResult::Duplicate { hash: hashed_val };
             }
             cur_node = node.next.as_deref();
         }
 
+        let record = HashRecord {
+            hash: hashed_val,
+            name: key.to_string(),
+            salary: value,
+        };
+
+        let new_node = Node {
+            record: record.clone(),
+            next: None,
+        };
+
+        // Insert at head if empty
         if write_guard.is_none() {
-            *write_guard = Some(Box::new(HashRecord {
-                hash: hashed_val,
-                name: key.to_string(),
-                salary: value,
-                next: None,
-            }));
-            println!("Inserted {},{},{}", hashed_val, key, value);
-            return;
+            *write_guard = Some(Box::new(new_node));
+            return InsertResult::Success { record };
         }
 
+        // Insert at tail
         let mut cur = write_guard.as_deref_mut();
-
         while let Some(node) = cur {
             if node.next.is_none() {
-                node.next = Some(Box::new(HashRecord {
-                    hash: hashed_val,
-                    name: key.to_string(),
-                    salary: value,
-                    next: None,
-                }));
-                println!("Inserted {},{},{}", hashed_val, key, value);
-                return;
+                node.next = Some(Box::new(new_node));
+                return InsertResult::Success { record };
             }
             cur = node.next.as_deref_mut();
         }
+
+        unreachable!()
     }
 
-    pub fn delete(&self, key: &str, priority: u32, log_file: &mut File) {
+    pub fn delete(&self, key: &str, priority: u32) -> DeleteResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
-
-        log_to_file(
-            log_file,
-            priority,
-            &format!("DELETE,{},{}", hashed_val, key),
-        );
         let mut write_guard = self.head.write().unwrap();
-
         let mut cur = &mut *write_guard;
 
         loop {
             match cur {
                 None => {
-                    println!("Entry {} not deleted.  Not in database.", hashed_val);
-                    return;
+                    return DeleteResult::NotFound { hash: hashed_val };
                 }
-                Some(node) if node.hash == hashed_val && node.name == key => {
-                    let salary = node.salary;
+                Some(node) if node.record.hash == hashed_val && node.record.name == key => {
+                    let result = DeleteResult::Success {
+                        record: node.record.clone(),
+                    };
                     *cur = node.next.take();
-                    println!("Deleted record for {},{},{}", hashed_val, key, salary);
-                    return;
+                    return result;
                 }
                 Some(node) => {
                     cur = &mut node.next;
@@ -128,83 +136,60 @@ impl HashTable {
         }
     }
 
-    pub fn update_salary(&self, key: &str, value: u32, priority: u32, log_file: &mut File) {
+    pub fn update_salary(&self, key: &str, value: u32, priority: u32) -> UpdateResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
-
-        log_to_file(
-            log_file,
-            priority,
-            &format!("UPDATE,{},{},{}", hashed_val, key, value),
-        );
         let mut write_guard = self.head.write().unwrap();
-
         let mut cur = &mut *write_guard;
 
         while let Some(node) = cur {
-            if node.hash == hashed_val && node.name == key {
-                let old_salary = node.salary;
-                node.salary = value;
-                println!(
-                    "Updated record {} from {},{},{} to {},{},{}",
-                    hashed_val, hashed_val, key, old_salary, hashed_val, key, value
-                );
-                return;
+            if node.record.hash == hashed_val && node.record.name == key {
+                let old_record = node.record.clone();
+                node.record.salary = value;
+                let new_record = node.record.clone();
+
+                return UpdateResult::Success {
+                    old_record,
+                    new_record,
+                };
             }
             cur = &mut node.next;
         }
 
-        println!("Update failed.  Entry {} not found.", hashed_val);
+        UpdateResult::NotFound { hash: hashed_val }
     }
 
-    pub fn search(&self, key: &str, priority: u32, log_file: &mut File) -> Option<u32> {
+    pub fn search(&self, key: &str, priority: u32) -> SearchResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
-
-        log_to_file(
-            log_file,
-            priority,
-            &format!("SEARCH,{},{}", hashed_val, key),
-        );
         let read_guard = self.head.read().unwrap();
-
         let mut cur = read_guard.as_deref();
 
         while let Some(r) = cur {
-            if r.hash == hashed_val && r.name == key {
-                let salary = r.salary;
-                println!("Found: {},{},{}", r.hash, r.name, salary);
-                return Some(salary);
+            if r.record.hash == hashed_val && r.record.name == key {
+                return SearchResult::Found {
+                    record: r.record.clone(),
+                };
             }
             cur = r.next.as_deref();
         }
 
-        println!("Not Found:  {} not found.", key);
-        None
+        SearchResult::NotFound {
+            name: key.to_string(),
+        }
     }
 
-    pub fn print(&self, priority: Option<u32>, log_file: &mut File) {
-        // Print out in thread log only if priority is Some
-        match priority {
-            Some(priority) => log_to_file(log_file, priority, "PRINT"),
-            None => {}
-        }
-
+    // Sorted by hash
+    pub fn get_all_records(&self) -> Vec<HashRecord> {
         let read_guard = self.head.read().unwrap();
-
-        println!("Current Database:");
-
-        let mut vec: Vec<&HashRecord> = Vec::new();
+        let mut vec: Vec<HashRecord> = Vec::new();
         let mut cur = read_guard.as_deref();
 
         while let Some(node) = cur {
-            vec.push(node);
+            vec.push(node.record.clone());
             cur = node.next.as_deref();
         }
 
         vec.sort_by_key(|r| r.hash);
-
-        for r in vec {
-            println!("{},{},{}", r.hash, r.name, r.salary);
-        }
+        vec
     }
 }
 

@@ -1,7 +1,7 @@
 // main.rs
 mod hash_table;
 
-use hash_table::HashTable;
+use hash_table::{DeleteResult, HashTable, InsertResult, SearchResult, UpdateResult};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Condvar, Mutex};
@@ -36,9 +36,6 @@ impl TurnManager {
 
 fn main() {
     let hash_table = Arc::new(HashTable::new());
-    let log_file = Arc::new(Mutex::new(
-        File::create("hash.log").expect("Failed to create hash.log"),
-    ));
 
     let file = File::open("commands.txt").expect("commands.txt not found");
     let reader = BufReader::new(file);
@@ -93,7 +90,6 @@ fn main() {
 
     for (thread_id, CommandWithPriority { command, priority }) in commands.into_iter().enumerate() {
         let table = Arc::clone(&hash_table);
-        let log_clone = Arc::clone(&log_file);
         let turn_manager_clone = Arc::clone(&turn_manager);
 
         let handle = thread::spawn(move || {
@@ -107,23 +103,63 @@ fn main() {
 
             turn_manager_clone.condvar.notify_all();
 
-            let mut log = log_clone.lock().unwrap();
-
             match command {
                 Command::Insert { name, salary } => {
-                    table.insert(&name, salary, priority, &mut log);
+                    let result = table.insert(&name, salary, priority);
+                    match result {
+                        InsertResult::Success { record } => {
+                            println!("Inserted {}", record);
+                        }
+                        InsertResult::Duplicate { hash } => {
+                            println!("Duplicate entry for {},{}", hash, name);
+                        }
+                    }
                 }
                 Command::Delete { name } => {
-                    table.delete(&name, priority, &mut log);
+                    let result = table.delete(&name, priority);
+                    match result {
+                        DeleteResult::Success { record } => {
+                            println!("Deleted record for {}", record);
+                        }
+                        DeleteResult::NotFound { .. } => {
+                            println!("{} not found", name);
+                        }
+                    }
                 }
                 Command::Update { name, salary } => {
-                    table.update_salary(&name, salary, priority, &mut log);
+                    let result = table.update_salary(&name, salary, priority);
+                    match result {
+                        UpdateResult::Success {
+                            old_record,
+                            new_record,
+                        } => {
+                            println!(
+                                "Updated record {} from {} to {}",
+                                name, old_record, new_record
+                            );
+                        }
+                        UpdateResult::NotFound { hash } => {
+                            println!("Update failed. Entry {} not found.", hash);
+                        }
+                    }
                 }
                 Command::Search { name } => {
-                    table.search(&name, priority, &mut log);
+                    let result = table.search(&name, priority);
+                    match result {
+                        SearchResult::Found { record } => {
+                            println!("Found: {}", record);
+                        }
+                        SearchResult::NotFound { name } => {
+                            println!("{} not found", name);
+                        }
+                    }
                 }
                 Command::Print => {
-                    table.print(Some(priority), &mut log);
+                    println!("Current Database:");
+
+                    table.get_all_records().iter().for_each(|record| {
+                        println!("{}", record);
+                    });
                 }
             }
         });
@@ -133,9 +169,4 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
-
-    // Final print as required by assignment
-    let mut log = log_file.lock().unwrap();
-
-    hash_table.print(None, &mut log);
 }
