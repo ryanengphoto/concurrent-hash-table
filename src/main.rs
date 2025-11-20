@@ -1,11 +1,14 @@
 // main.rs
 mod hash_table;
+mod logger;
 
 use hash_table::{DeleteResult, HashTable, InsertResult, SearchResult, UpdateResult};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+
+use crate::logger::{LogMessage, ThreadLogger};
 
 enum Command {
     Insert { name: String, salary: u32 },
@@ -35,7 +38,8 @@ impl TurnManager {
 }
 
 fn main() {
-    let hash_table = Arc::new(HashTable::new());
+    let logger = Arc::new(ThreadLogger::new("hash.log"));
+    let hash_table = Arc::new(HashTable::new(Arc::clone(&logger)));
 
     let file = File::open("commands.txt").expect("commands.txt not found");
     let reader = BufReader::new(file);
@@ -92,7 +96,13 @@ fn main() {
         let table = Arc::clone(&hash_table);
         let turn_manager_clone = Arc::clone(&turn_manager);
 
+        let logger = Arc::clone(&logger);
         let handle = thread::spawn(move || {
+            logger.log_id(
+                thread_id as u32,
+                LogMessage::Custom("WAITING FOR MY TURN".to_string()),
+            );
+
             let mut turn = turn_manager_clone.current_turn.lock().unwrap();
 
             while *turn != thread_id as u32 {
@@ -102,6 +112,11 @@ fn main() {
             *turn += 1;
 
             turn_manager_clone.condvar.notify_all();
+
+            logger.log_id(
+                thread_id as u32,
+                LogMessage::Custom("AWAKENED FOR WORK".to_string()),
+            );
 
             match command {
                 Command::Insert { name, salary } => {
@@ -135,7 +150,7 @@ fn main() {
                         } => {
                             println!(
                                 "Updated record {} from {} to {}",
-                                name, old_record, new_record
+                                old_record.hash, old_record, new_record
                             );
                         }
                         UpdateResult::NotFound { hash } => {
@@ -150,14 +165,14 @@ fn main() {
                             println!("Found: {}", record);
                         }
                         SearchResult::NotFound { name } => {
-                            println!("{} not found", name);
+                            println!("{} not found.", name);
                         }
                     }
                 }
                 Command::Print => {
                     println!("Current Database:");
-
-                    table.get_all_records().iter().for_each(|record| {
+                    let result = table.get_all_records(priority);
+                    result.iter().for_each(|record| {
                         println!("{}", record);
                     });
                 }
@@ -169,4 +184,6 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
+
+    hash_table.log_summary();
 }

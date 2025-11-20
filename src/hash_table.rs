@@ -1,4 +1,9 @@
-use std::{fmt, sync::RwLock};
+use std::{
+    fmt,
+    sync::{Arc, RwLock},
+};
+
+use crate::logger::{LockType, LogMessage, ThreadLogger};
 
 #[derive(Debug, Clone)]
 pub struct HashRecord {
@@ -47,12 +52,14 @@ pub enum SearchResult {
 
 pub struct HashTable {
     pub head: RwLock<Option<Box<Node>>>,
+    logger: Arc<ThreadLogger>,
 }
 
 impl HashTable {
-    pub fn new() -> Self {
+    pub fn new(logger: Arc<ThreadLogger>) -> Self {
         HashTable {
             head: RwLock::new(None),
+            logger,
         }
     }
 
@@ -71,12 +78,23 @@ impl HashTable {
 
     pub fn insert(&self, key: &str, value: u32, priority: u32) -> InsertResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        self.logger.log_id(
+            priority,
+            LogMessage::Custom(format!("INSERT,{},{},{}", hashed_val, key, value)),
+        );
+
         let mut write_guard = self.head.write().unwrap();
+        self.logger
+            .log_id(priority, LogMessage::Acquire(LockType::Write));
 
         // Check for duplicates
         let mut cur_node = write_guard.as_deref();
         while let Some(node) = cur_node {
             if node.record.hash == hashed_val && node.record.name == key {
+                drop(write_guard);
+                self.logger
+                    .log_id(priority, LogMessage::Release(LockType::Write));
                 return InsertResult::Duplicate { hash: hashed_val };
             }
             cur_node = node.next.as_deref();
@@ -96,6 +114,9 @@ impl HashTable {
         // Insert at head if empty
         if write_guard.is_none() {
             *write_guard = Some(Box::new(new_node));
+            drop(write_guard);
+            self.logger
+                .log_id(priority, LogMessage::Release(LockType::Write));
             return InsertResult::Success { record };
         }
 
@@ -104,6 +125,9 @@ impl HashTable {
         while let Some(node) = cur {
             if node.next.is_none() {
                 node.next = Some(Box::new(new_node));
+                drop(write_guard);
+                self.logger
+                    .log_id(priority, LogMessage::Release(LockType::Write));
                 return InsertResult::Success { record };
             }
             cur = node.next.as_deref_mut();
@@ -114,12 +138,23 @@ impl HashTable {
 
     pub fn delete(&self, key: &str, priority: u32) -> DeleteResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        self.logger.log_id(
+            priority,
+            LogMessage::Custom(format!("DELETE,{},{}", hashed_val, key)),
+        );
+
+        self.logger
+            .log_id(priority, LogMessage::Acquire(LockType::Write));
         let mut write_guard = self.head.write().unwrap();
         let mut cur = &mut *write_guard;
 
         loop {
             match cur {
                 None => {
+                    drop(write_guard);
+                    self.logger
+                        .log_id(priority, LogMessage::Release(LockType::Write));
                     return DeleteResult::NotFound { hash: hashed_val };
                 }
                 Some(node) if node.record.hash == hashed_val && node.record.name == key => {
@@ -127,6 +162,9 @@ impl HashTable {
                         record: node.record.clone(),
                     };
                     *cur = node.next.take();
+                    drop(write_guard);
+                    self.logger
+                        .log_id(priority, LogMessage::Release(LockType::Write));
                     return result;
                 }
                 Some(node) => {
@@ -138,6 +176,14 @@ impl HashTable {
 
     pub fn update_salary(&self, key: &str, value: u32, priority: u32) -> UpdateResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        self.logger.log_id(
+            priority,
+            LogMessage::Custom(format!("UPDATE,{},{},{}", hashed_val, key, value)),
+        );
+
+        self.logger
+            .log_id(priority, LogMessage::Acquire(LockType::Write));
         let mut write_guard = self.head.write().unwrap();
         let mut cur = &mut *write_guard;
 
@@ -147,6 +193,9 @@ impl HashTable {
                 node.record.salary = value;
                 let new_record = node.record.clone();
 
+                drop(write_guard);
+                self.logger
+                    .log_id(priority, LogMessage::Release(LockType::Write));
                 return UpdateResult::Success {
                     old_record,
                     new_record,
@@ -155,16 +204,29 @@ impl HashTable {
             cur = &mut node.next;
         }
 
+        drop(write_guard);
+        self.logger
+            .log_id(priority, LogMessage::Release(LockType::Write));
         UpdateResult::NotFound { hash: hashed_val }
     }
 
     pub fn search(&self, key: &str, priority: u32) -> SearchResult {
         let hashed_val = Self::jenkins_one_at_a_time_hash(key.as_bytes());
+
+        self.logger.log_id(
+            priority,
+            LogMessage::Custom(format!("SEARCH,{},{}", hashed_val, key)),
+        );
+
         let read_guard = self.head.read().unwrap();
+        self.logger
+            .log_id(priority, LogMessage::Acquire(LockType::Read));
         let mut cur = read_guard.as_deref();
 
         while let Some(r) = cur {
             if r.record.hash == hashed_val && r.record.name == key {
+                self.logger
+                    .log_id(priority, LogMessage::Release(LockType::Read));
                 return SearchResult::Found {
                     record: r.record.clone(),
                 };
@@ -172,13 +234,45 @@ impl HashTable {
             cur = r.next.as_deref();
         }
 
+        self.logger
+            .log_id(priority, LogMessage::Release(LockType::Read));
         SearchResult::NotFound {
             name: key.to_string(),
         }
     }
 
     // Sorted by hash
-    pub fn get_all_records(&self) -> Vec<HashRecord> {
+    pub fn get_all_records(&self, priority: u32) -> Vec<HashRecord> {
+        self.logger
+            .log_id(priority, LogMessage::Custom("PRINT".to_string()));
+        self.logger
+            .log_id(priority, LogMessage::Acquire(LockType::Read));
+        let records = self._get_all_records();
+        self.logger
+            .log_id(priority, LogMessage::Release(LockType::Read));
+        records
+    }
+
+    pub fn log_summary(&self) {
+        let summary = format!(
+            "
+Number of lock acquisitions: {}
+Number of lock releases: {}
+Final Table:
+{}",
+            self.logger.get_acquisition_count(),
+            self.logger.get_release_count(),
+            self._get_all_records()
+                .iter()
+                .map(|r| format!("{}", r))
+                .collect::<Vec<String>>()
+                .join("\n")
+        );
+
+        self.logger.log_str(&summary);
+    }
+    // Helper for get_all_records that does not log - need for final output to thread log.
+    fn _get_all_records(&self) -> Vec<HashRecord> {
         let read_guard = self.head.read().unwrap();
         let mut vec: Vec<HashRecord> = Vec::new();
         let mut cur = read_guard.as_deref();
@@ -189,6 +283,7 @@ impl HashTable {
         }
 
         vec.sort_by_key(|r| r.hash);
+
         vec
     }
 }
