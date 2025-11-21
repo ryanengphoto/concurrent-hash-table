@@ -92,20 +92,20 @@ fn main() {
     let turn_manager = Arc::new(TurnManager::new(0));
     let mut handles = vec![];
 
-    for (thread_id, CommandWithPriority { command, priority }) in commands.into_iter().enumerate() {
+    for CommandWithPriority { command, priority } in commands.into_iter() {
         let table = Arc::clone(&hash_table);
         let turn_manager_clone = Arc::clone(&turn_manager);
 
         let logger = Arc::clone(&logger);
         let handle = thread::spawn(move || {
             logger.log_id(
-                thread_id as u32,
+                priority as u32,
                 LogMessage::Custom("WAITING FOR MY TURN".to_string()),
             );
 
             let mut turn = turn_manager_clone.current_turn.lock().unwrap();
 
-            while *turn != thread_id as u32 {
+            while *turn != priority as u32 {
                 turn = turn_manager_clone.condvar.wait(turn).unwrap();
             }
 
@@ -114,7 +114,7 @@ fn main() {
             turn_manager_clone.condvar.notify_all();
 
             logger.log_id(
-                thread_id as u32,
+                priority as u32,
                 LogMessage::Custom("AWAKENED FOR WORK".to_string()),
             );
 
