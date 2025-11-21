@@ -113,6 +113,9 @@ fn main() {
 
             turn_manager_clone.condvar.notify_all();
 
+            // Release the lock before doing the work
+            drop(turn);
+
             logger.log_id(
                 priority as u32,
                 LogMessage::Custom("AWAKENED FOR WORK".to_string()),
