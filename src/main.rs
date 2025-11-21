@@ -185,5 +185,15 @@ fn main() {
         handle.join().unwrap();
     }
 
+    // Final compulsory stdout print. This prints with thread ID 0,
+    // since all threads have completed and we're calling this from the main thread.
+    println!("Final Table:");
+    hash_table.get_all_records(0).iter().for_each(|record| {
+        println!("{}", record);
+    });
+
+    // This is also called AFTER the thread log, so it won't include the final read lock
+    // acquisition - the original expected output doesn't.
+    // Final log summary of table to hash.log along with lock statistics.
     hash_table.log_summary();
 }
