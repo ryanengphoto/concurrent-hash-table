@@ -2,7 +2,7 @@
 Joseph Zalusky and Ryan Eng
 
 ## Usage
-There are no dependencies in the program, simply run the below from the root directory `../src`.
+There are no dependencies in the program, simply run the below from the root directory `../src`. `Commands.txt` must be present in the root directory.
 ```cargo run main```
 This can be done from eustis3 with no other commands needed.
 
