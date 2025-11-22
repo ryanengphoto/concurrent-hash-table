@@ -1,4 +1,6 @@
 # concurrent-hash-table
+Joseph Zalusky and Ryan Eng
+
 ## Usage
 There are no dependencies in the program, simply run the below from the root directory `../src`.
 ```cargo run main```
