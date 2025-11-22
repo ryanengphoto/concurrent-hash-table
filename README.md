@@ -13,3 +13,5 @@ The main disadvantage of Rust is that these safety checks can make the code more
 
 ## AI Usage
 AI was used primarily for a boilerplate for both main.rs and hash_table.rs, as well as subsequent debugging after writing code. It generated some of the structure of the program and was used for more trivial tasks such as converting Jenkin's Hash function from C to rust, it did not however do the core of the concurrency logic. Prompts focused on creating outlines and analyzing code that was written by us to help evaluate issues with compilation and give recommendations on how to resolve them. 
+
+GitHub CoPilot was additionally used to review PRs which is present in our repos. This caught some minor issues.
